@@ -8,8 +8,10 @@ from core.models import PatientProfile, DoseEvent
 from ui import plot_utils as plot
 
 @st.cache_data(show_spinner=False)
-def run_simulation_cached(drug_schedule, user_profile, sim_duration):
-    # PKEngine 객체 생성 (환자 프로필 적용)
+def run_simulation_cached(drug_schedule, user_profile, sim_duration, overrides=None):
+    if overrides is None:
+        overrides = {}
+        
     patient = PatientProfile(
         name=user_profile.get("name", "User"),
         age=user_profile.get("age", 50),
@@ -17,32 +19,46 @@ def run_simulation_cached(drug_schedule, user_profile, sim_duration):
         height_cm=user_profile.get("height", 170.0),
         body_fat_pct=user_profile.get("body_fat", 22.0),
         ast_u_l=user_profile.get("ast", 20.0),
-        alt_u_l=user_profile.get("alt", 20.0)
+        alt_u_l=user_profile.get("alt", 20.0),
+        egfr=user_profile.get("egfr", 100.0)
     )
     engine = PKEngine(patient)
     
-    # Session Schedule을 DoseEvent로 변환
-    # 스케줄을 기간(sim_duration) 전체로 풀어서 이벤트 리스트 생성
     events = []
     for item in drug_schedule:
         drug_id = item["drug_id"]
         dose = item["dose"]
         interval = item["interval"]
         route = item["type"]
+        item_id = item["id"]
         
-        # 0일부터 sim_duration 일까지 interval 간격으로 이벤트 생성
         current_time_h = 0.0
         max_time_h = sim_duration * 24.0
+        dose_number = 1
+        
         while current_time_h <= max_time_h:
+            # 기본 이벤트 속성
+            e_type = "scheduled"
+            e_delay = 0.0
+            
+            # 오버라이드 확인
+            override_key = f"{item_id}_{dose_number}"
+            if override_key in overrides:
+                ovr = overrides[override_key]
+                e_type = ovr["type"]
+                e_delay = ovr.get("delay_h", 0.0)
+            
             events.append(DoseEvent(
                 drug_id=drug_id,
                 dose=dose,
                 time_h=current_time_h,
-                route=route
+                route=route,
+                event_type=e_type,
+                delay_h=e_delay
             ))
             current_time_h += (interval * 24.0)
+            dose_number += 1
             
-    # 시뮬레이션 실행
     return engine.simulate(events, days=sim_duration, resolution=24)
 
 
@@ -63,12 +79,69 @@ def render_simulator_tab():
         st.info("사이드바에서 약물을 추가하여 시뮬레이션을 시작하세요.")
         return None
 
+    # Missed/Delayed Dose Override UI
+    st.markdown("---")
+    with st.expander("⏱️ 특정 투여일 조정 (누락/지연)", expanded=False):
+        st.caption("특정 회차의 투여를 건너뛰거나 지연시킬 수 있습니다.")
+        if "dose_overrides" not in st.session_state:
+            st.session_state.dose_overrides = {}
+            
+        overrides = st.session_state.dose_overrides
+        
+        c1, c2, c3, c4 = st.columns(4)
+        
+        # 1. 스케줄된 약물 선택
+        target_item = c1.selectbox("적용 대상 약물", options=sched, format_func=lambda x: f"{x['name']} ({x['dose']}mg)")
+        
+        if target_item:
+            # 2. 회차 선택
+            max_doses = int(sim_duration / target_item["interval"]) + 1
+            dose_num = c2.number_input("조정할 회차 (N번째)", min_value=1, max_value=max_doses, value=1)
+            
+            # 3. 상태 변경
+            ovr_type = c3.selectbox("상태 변경", ["지연 (Delayed)", "누락 (Missed)"])
+            
+            # 4. 지연 시간
+            delay_hours = 0.0
+            if ovr_type == "지연 (Delayed)":
+                delay_hours = c4.number_input("지연 시간 (시간)", min_value=0.5, value=12.0, step=1.0)
+                
+            if st.button("적용"):
+                key = f"{target_item['id']}_{dose_num}"
+                overrides[key] = {
+                    "type": "missed" if ovr_type == "누락 (Missed)" else "delayed",
+                    "delay_h": delay_hours
+                }
+                st.rerun()
+                
+        if overrides:
+            st.markdown("**현재 적용된 예외:**")
+            to_delete = []
+            for k, v in overrides.items():
+                item_id, d_num = k.rsplit("_", 1)
+                match = next((i for i in sched if i["id"] == item_id), None)
+                if match:
+                    desc = f"**{match['name']}** {d_num}회차: "
+                    if v["type"] == "missed": desc += "누락"
+                    else: desc += f"{v['delay_h']}시간 지연"
+                    
+                    cc1, cc2 = st.columns([3,1])
+                    cc1.write(desc)
+                    if cc2.button("삭제", key=f"del_ovr_{k}"):
+                        to_delete.append(k)
+            
+            if to_delete:
+                for k in to_delete:
+                    del overrides[k]
+                st.rerun()
+
     # 시뮬레이션 실행 (장기 예측을 위해 실제 보여줄 기간보다 여유있게 계산)
     calc_duration = max(sim_duration, 180)
     t_full, y_full = run_simulation_cached(
         sched,
         st.session_state.user_profile,
-        calc_duration
+        calc_duration,
+        st.session_state.get("dose_overrides", {})
     )
 
     y_full_b = None
@@ -78,7 +151,8 @@ def render_simulator_tab():
             _, y_full_b = run_simulation_cached(
                 sched_b,
                 st.session_state.user_profile,
-                calc_duration
+                calc_duration,
+                st.session_state.get("dose_overrides", {})
             )
 
     # 단위 변환 로직 보류 (범용화)

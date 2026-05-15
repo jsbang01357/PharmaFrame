@@ -17,6 +17,8 @@ from utils import utils
 from ui import sidebar as ui
 from ui import plot_utils as plot
 from ui import simulation_tab as sim
+from ui import safety_tab as safe
+from ui import procedure_tab as proc
 
 
 # -----------------------------------------------------------------------------
@@ -278,6 +280,8 @@ if not st.session_state.drug_schedule and not allow_app_without_landing:
 # -----------------------------------------------------------------------------
 tabs_config = [
     {"title": "📈 시뮬레이션 (Simulation)", "key": "sim"},
+    {"title": "🏥 처치/수술 계획 (Procedure Plan)", "key": "proc"},
+    {"title": "🛡️ 안전성 & 모니터링 (Safety)", "key": "safe"},
     {"title": "📊 리포트/데이터 (Export)", "key": "rep"},
     {"title": "❓ 도움말 (FAQ)", "key": "faq"}
 ]
@@ -294,7 +298,15 @@ with tabs["sim"]:
     # simulation_tab에서 알아서 PKEngine을 캐싱 및 렌더링함
     sim.render_simulator_tab()
 
-# [Tab 2: Report & Export]
+# [Tab 2: Procedure Plan]
+with tabs["proc"]:
+    proc.render_procedure_tab()
+    
+# [Tab 3: Safety & Monitoring]
+with tabs["safe"]:
+    safe.render_safety_tab()
+
+# [Tab 4: Report & Export]
 with tabs["rep"]:
     if IS_OFFLINE:
         st.header(utils.t("emr_tab_title"))

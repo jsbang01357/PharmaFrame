@@ -36,21 +36,28 @@ def render_profile_section():
         show_details = st.toggle("상세 임상 수치 입력", value=False)
         
         if show_details:
+            st.markdown("##### 🧪 간 기능 (Hepatic)")
             col_liver1, col_liver2 = st.columns(2)
             with col_liver1:
                 ast_val = st.number_input("AST (U/L)", min_value=0.0, value=float(st.session_state.user_profile.get("ast", 20.0)))
             with col_liver2:
                 alt_val = st.number_input("ALT (U/L)", min_value=0.0, value=float(st.session_state.user_profile.get("alt", 20.0)))
+            
+            st.markdown("##### 💧 신장 기능 (Renal)")
+            egfr_val = st.number_input("eGFR (mL/min/1.73m²)", min_value=5.0, max_value=150.0, value=float(st.session_state.user_profile.get("egfr", 100.0)))
+            
+            st.markdown("##### 🏃 체성분 (Body Composition)")
             body_fat = st.slider("체지방률 (%)", 5.0, 50.0, value=float(st.session_state.user_profile.get("body_fat", 22.0)), step=0.5)
         else:
             estimated_body_fat = 1.20 * bmi + 0.23 * age - 5.4
             body_fat = float(st.session_state.user_profile.get("body_fat", estimated_body_fat))
             ast_val = float(st.session_state.user_profile.get("ast", 20.0))
             alt_val = float(st.session_state.user_profile.get("alt", 20.0))
+            egfr_val = float(st.session_state.user_profile.get("egfr", 100.0))
 
         st.session_state.user_profile.update({
             "age": age, "height": height, "weight": weight,
-            "body_fat": body_fat, "ast": ast_val, "alt": alt_val
+            "body_fat": body_fat, "ast": ast_val, "alt": alt_val, "egfr": egfr_val
         })
 
 def get_available_categories():
@@ -115,7 +122,16 @@ def render_medication_section():
                 st.session_state.drug_schedule_b = [d.copy() for d in st.session_state.drug_schedule]
                 st.rerun()
 
-        dummy_patient = PatientProfile()
+        dummy_patient = PatientProfile(
+            name=st.session_state.user_profile.get("name", "User"),
+            age=st.session_state.user_profile.get("age", 50),
+            weight_kg=st.session_state.user_profile.get("weight", 65.0),
+            height_cm=st.session_state.user_profile.get("height", 165.0),
+            body_fat_pct=st.session_state.user_profile.get("body_fat", 22.0),
+            ast_u_l=st.session_state.user_profile.get("ast", 20.0),
+            alt_u_l=st.session_state.user_profile.get("alt", 20.0),
+            egfr=st.session_state.user_profile.get("egfr", 100.0)
+        )
         engine = PKEngine(dummy_patient)
         
         module_cat = st.session_state.get("current_module", "thyroid")

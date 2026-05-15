@@ -52,37 +52,66 @@ class PKEngine:
             ka = ke + 0.01
         return ka
 
-    def _get_ka_ke(self, drug: DrugPK, route: str) -> Tuple[float, float]:
-        ke = np.log(2) / drug.half_life_h
-        t_peak = drug.routes[route].t_max_h
-        ka = self._solve_ka_newton(t_peak, ke)
-        return ka, ke
-
-    def _get_modifiers(self, drug: DrugPK) -> float:
-        """환자 특성별 농도 보정 (확장 가능)"""
-        # 1. 간 대사 보정
-        liver_factor = 1.0
+    def _get_adjusted_ka_ke_vd(self, drug: DrugPK, route: str) -> Tuple[float, float, float]:
+        """환자 임상 수치(eGFR, LFT)에 따른 ke 및 Vd 보정"""
+        # 1. Base parameters
+        ke_base = np.log(2) / drug.half_life_h
+        r_info = drug.routes[route]
+        
+        # 2. Clearance Adjustment (ke = CL / Vd)
+        # 2.1 Renal Adjustment
+        renal_cl_factor = 1.0
+        if drug.renal_elimination_fraction > 0:
+            # eGFR 90 이상을 정상(1.0)으로 간주
+            if self.patient.egfr < 90:
+                renal_cl_factor = max(0.1, self.patient.egfr / 90.0)
+                
+        # 2.2 Hepatic Adjustment
+        hepatic_cl_factor = 1.0
         if drug.hepatic_elimination_fraction > 0:
             limit = 40.0
-            if self.patient.ast_u_l > limit or self.patient.alt_u_l > limit:
-                excess = max(self.patient.ast_u_l, self.patient.alt_u_l) - limit
-                liver_factor = 1.0 + (excess / 10.0) * 0.02 * drug.hepatic_elimination_fraction
-                liver_factor = min(liver_factor, 1.2)
+            worst_lft = max(self.patient.ast_u_l, self.patient.alt_u_l)
+            if worst_lft > limit:
+                # LFT 상승에 비례하여 대사율 감소 가정 (매우 보수적인 단순 모델)
+                # 40->1.0, 140->0.5 (최대 50% 감소)
+                excess = min(worst_lft - limit, 200.0)
+                hepatic_cl_factor = 1.0 - (excess / 200.0) * 0.5
+                hepatic_cl_factor = max(0.2, hepatic_cl_factor)
+                
+        # Total Clearance Factor
+        other_fraction = max(0.0, 1.0 - drug.renal_elimination_fraction - drug.hepatic_elimination_fraction)
+        total_cl_factor = (
+            drug.renal_elimination_fraction * renal_cl_factor +
+            drug.hepatic_elimination_fraction * hepatic_cl_factor +
+            other_fraction
+        )
         
-        # 2. Vd 보정 (BMI 기반 예시)
+        ke_adj = ke_base * total_cl_factor
+        
+        # 3. Volume of Distribution (Vd) Adjustment
+        # BMI와 체지방률 기반 보정 (단순화 모델)
         baseline_bmi = 22.0
-        bmi_offset = (self.patient.bmi - baseline_bmi) * 0.01
-        vd_factor = 1.0 + bmi_offset
-        vd_factor = np.clip(vd_factor, 0.9, 1.3)
+        bmi_ratio = self.patient.bmi / baseline_bmi
         
-        return liver_factor / vd_factor
+        # 지용성 약물(대체로 Vd가 큰 약물)은 체지방 영향을 더 크게 받음
+        vd_adj_factor = 1.0
+        if r_info.vd_const > 1.0: # Vd가 큰 경우 (지방 조직 분포율 높음 가정)
+            vd_adj_factor = 1.0 + (self.patient.body_fat_pct - 22.0) * 0.01
+        else:
+            vd_adj_factor = 1.0 + (bmi_ratio - 1.0) * 0.5
+            
+        vd_adj_factor = np.clip(vd_adj_factor, 0.8, 1.5)
+        adjusted_vd_const = r_info.vd_const * vd_adj_factor
+        
+        # 4. Absorption Constant (ka) - 재계산
+        ka_adj = self._solve_ka_newton(r_info.t_max_h, ke_adj)
+        
+        return ka_adj, ke_adj, adjusted_vd_const
 
     def bateman_function(self, t: np.ndarray, dose: float, ka: float, ke: float, f: float, ester_factor: float, vd_const: float) -> np.ndarray:
         """Bateman Function: C(t) 계산 (단위: Dose Unit / L)"""
         total_volume = self.patient.weight_kg * vd_const
         
-        # 보정치 적용
-        # 여기서는 단순화를 위해 모든 약물에 적용 가능하게 설계
         effective_dose = dose * f * ester_factor
         
         if ka == ke:
@@ -110,7 +139,7 @@ class PKEngine:
             if event.route not in drug.routes:
                 continue
                 
-            ka, ke = self._get_ka_ke(drug, event.route)
+            ka, ke, vd_const = self._get_adjusted_ka_ke_vd(drug, event.route)
             r_info = drug.routes[event.route]
             
             # 실제 투여 시간 계산 (누락/지연 반영)
@@ -126,11 +155,9 @@ class PKEngine:
             if np.any(valid_mask):
                 conc = self.bateman_function(
                     shifted_t[valid_mask], event.dose, ka, ke, 
-                    r_info.bioavailability, drug.ester_factor, r_info.vd_const
+                    r_info.bioavailability, drug.ester_factor, vd_const
                 )
                 
-                # 환자별 수정자 적용 (예: 간기능 등)
-                mod = self._get_modifiers(drug)
-                total_conc[valid_mask] += (conc * mod)
+                total_conc[valid_mask] += conc
                 
         return t_hours / 24, total_conc

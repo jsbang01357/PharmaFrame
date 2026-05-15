@@ -5,8 +5,8 @@ import os
 import sys
 
 # Custom Modules
-from io import data_manager as inout
-from io import emr_manager as EMR
+from app_io import data_manager as inout
+from app_io import emr_manager as EMR
 from utils import utils
 from ui import sidebar as ui
 from ui import simulation_tab as sim

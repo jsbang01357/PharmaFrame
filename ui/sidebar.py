@@ -7,7 +7,7 @@ import uuid
 from utils import utils
 from core.pk_engine import PKEngine
 from core.models import PatientProfile
-from io import emr_manager as EMR
+from app_io import emr_manager as EMR
 
 def render_emr_section(is_offline=False):
     if is_offline:
@@ -186,6 +186,34 @@ def render_medication_section():
                     if st.button("🗑️ 삭제", key=f"del_{item['id']}_{target_sched_key}_{i}"):
                         st.session_state[target_sched_key].pop(i)
                         st.rerun()
+
+def apply_custom_theme():
+    """앱의 전반적인 테마와 스타일 CSS 적용"""
+    st.markdown("""
+        <style>
+        .main {
+            background-color: #f8f9fa;
+        }
+        .stButton>button {
+            border-radius: 5px;
+        }
+        .stMetric {
+            background-color: transparent;
+            padding: 0px;
+            border-radius: 0px;
+            box-shadow: none;
+        }
+        /* 사이드바 다크 테마 텍스트 가독성 향상 */
+        .sidebar .sidebar-content {
+            background-color: #262730;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+def render_footer():
+    """앱 하단 푸터 렌더링"""
+    st.markdown("---")
+    st.caption("© 2026 PharmaFrame Project · 학술 및 교육용 시뮬레이터 · Medical Engineering Lab")
 
 def render_sidebar(is_offline=False):
     st.header("🧬 Settings")

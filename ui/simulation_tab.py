@@ -217,10 +217,6 @@ def render_simulator_tab():
 
     if st.session_state.compare_mode and stats_b:
         st.markdown("##### 시나리오 B 지표")
-        cb1, col2, cb3, cb4 = st.columns(4) # Reusing col2 for spacing or just cb2
-        cb1.metric("최고 농도 (Peak)", f"{stats_b['peak']:.1f}", delta=f"{stats_b['peak']-stats['peak']:.1f}")
-        cb2 = cb1 # dummy
-        # Just use cb1-cb4 correctly
         cb1, cb2, cb3, cb4 = st.columns(4)
         cb1.metric("최고 농도 (Peak)", f"{stats_b['peak']:.1f}", delta=f"{stats_b['peak']-stats['peak']:.1f}")
         cb2.metric("최저 농도 (Trough)", f"{stats_b['trough']:.1f}", delta=f"{stats_b['trough']-stats['trough']:.1f}")

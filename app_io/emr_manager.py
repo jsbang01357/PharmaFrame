@@ -2,7 +2,7 @@ import streamlit as st
 import json
 import hashlib
 from datetime import datetime
-from io import data_manager as inout
+from app_io import data_manager as inout
 from utils import utils
 
 

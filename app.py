@@ -154,10 +154,15 @@ if "user_profile" not in st.session_state:
         "ast": 20.0,
         "alt": 20.0,
         "egfr": 100.0,
-        "body_fat": 22.0
+        "body_fat": 22.0,
     }
 if "calibration_factors" not in st.session_state:
-    st.session_state.calibration_factors = {"Injection": 1.0, "Oral": 1.0, "Transdermal": 1.0, "Sublingual": 1.0}
+    st.session_state.calibration_factors = {
+        "Injection": 1.0,
+        "Oral": 1.0,
+        "Transdermal": 1.0,
+        "Sublingual": 1.0,
+    }
 if "lab_history" not in st.session_state:
     st.session_state.lab_history = {}
 if "surgery_mode" not in st.session_state:
@@ -171,7 +176,9 @@ if "dose_overrides" not in st.session_state:
 if "disclaimer_agreed" not in st.session_state:
     st.session_state.disclaimer_agreed = False
 if "offline_onboarding_done" not in st.session_state:
-    st.session_state.offline_onboarding_done = IS_OFFLINE and _load_offline_onboarding_done()
+    st.session_state.offline_onboarding_done = (
+        IS_OFFLINE and _load_offline_onboarding_done()
+    )
 
 EMR.init_session()
 EMR.handle_mounting()
@@ -181,7 +188,9 @@ inout.DataManager.handle_import_session()
 # -----------------------------------------------------------------------------
 # 4. 사이드바 렌더링 (Sidebar Rendering)
 # -----------------------------------------------------------------------------
-allow_app_without_landing = IS_OFFLINE and st.session_state.get("offline_onboarding_done", False)
+allow_app_without_landing = IS_OFFLINE and st.session_state.get(
+    "offline_onboarding_done", False
+)
 with st.sidebar:
     if st.session_state.get("disclaimer_agreed", False) or allow_app_without_landing:
         IS_OFFLINE = ui.render_sidebar(IS_OFFLINE)
@@ -239,7 +248,7 @@ tabs_config = [
     {"title": "🏥 처치/수술 계획 (Procedure Plan)", "key": "proc"},
     {"title": "🛡️ 안전성 & 모니터링 (Safety)", "key": "safe"},
     {"title": "📊 리포트/데이터 (Export)", "key": "rep"},
-    {"title": "❓ 도움말 (FAQ)", "key": "faq"}
+    {"title": "❓ 도움말 (FAQ)", "key": "faq"},
 ]
 
 tab_objs = st.tabs([t["title"] for t in tabs_config])
@@ -256,7 +265,7 @@ with tabs["sim"]:
 # [Tab 2: Procedure Plan]
 with tabs["proc"]:
     proc.render_procedure_tab()
-    
+
 # [Tab 3: Safety & Monitoring]
 with tabs["safe"]:
     safe.render_safety_tab()

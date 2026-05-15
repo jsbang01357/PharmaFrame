@@ -1,19 +1,14 @@
 import streamlit as st
-import numpy as np
 from datetime import datetime, timedelta
 import socket
 import os
 import sys
-import streamlit.components.v1 as components
 
 # Custom Modules
-from core import data
-from core import pk_engine as analysis
 from io import data_manager as inout
 from io import emr_manager as EMR
 from utils import utils
 from ui import sidebar as ui
-from ui import plot_utils as plot
 from ui import simulation_tab as sim
 from ui import safety_tab as safe
 from ui import procedure_tab as proc

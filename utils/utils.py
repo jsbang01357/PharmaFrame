@@ -2,7 +2,6 @@ import datetime
 import numpy as np
 import json
 import os
-from core import data
 from datetime import datetime, timedelta
 
 """

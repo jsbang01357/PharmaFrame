@@ -1032,8 +1032,8 @@ class ReportGenerator:
                 "surgery_date", "start_date", "anesthesia_type",
                 "lab_data", "stats", "sim_duration",
             ]
-            graph_payload = {k: sim_data.get(k) for k in chart_keys}
-            fig = plot.create_hormone_chart(**graph_payload)
+            graph_payload = {k: sim_data.get(k) for k in chart_keys if k != "anesthesia_type" and k != "stats"}
+            fig = plot.create_pk_chart(**graph_payload)
             fig.update_layout(
                 font=dict(family="NanumGothic, Malgun Gothic, AppleGothic, sans-serif", size=14),
                 plot_bgcolor='white',
@@ -1086,7 +1086,9 @@ class ReportGenerator:
         self._new_page()
         self._section_title(f"{utils.t('pdf_graph_title')} ({utils.t('surg_title')})", icon_key="graph")
         try:
-            fig = plot.create_hormone_chart(**graph_data)
+            # Remove keys not supported by create_pk_chart
+            clean_graph_data = {k: v for k, v in graph_data.items() if k != "anesthesia_type" and k != "stats"}
+            fig = plot.create_pk_chart(**clean_graph_data)
             fig.update_layout(
                 font=dict(family="NanumGothic, Malgun Gothic, AppleGothic, sans-serif", size=14),
                 plot_bgcolor='white',

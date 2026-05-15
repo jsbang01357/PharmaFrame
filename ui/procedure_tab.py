@@ -1,10 +1,7 @@
 import streamlit as st
 from datetime import datetime, timedelta
-import numpy as np
 
 from utils import utils
-from core.pk_engine import PKEngine
-from core.models import PatientProfile
 from ui import plot_utils as plot
 from ui.simulation_tab import run_simulation_cached
 

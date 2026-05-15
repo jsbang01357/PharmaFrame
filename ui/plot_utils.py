@@ -3,14 +3,12 @@ from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime, timedelta
 from utils import utils
-from core import data
 
 def create_pk_chart(
     t_dates, t_days, y_conc, unit_choice,
     compare_mode=False, y_conc_b=None,
-    surgery_mode=False, stop_day=None, resume_day=None, surgery_date=None, start_date=None, anesthesia_type=None,
+    surgery_mode=False, stop_day=None, resume_day=None, surgery_date=None, start_date=None,
     lab_data=None,
-    stats=None,
     sim_duration=30
 ):
     """

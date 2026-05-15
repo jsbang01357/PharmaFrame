@@ -4,8 +4,6 @@ from datetime import datetime, timedelta
 import socket
 import os
 import sys
-import re
-import base64
 import streamlit.components.v1 as components
 
 # Custom Modules
@@ -17,8 +15,6 @@ from utils import utils
 from ui import sidebar as ui
 from ui import plot_utils as plot
 from ui import simulation_tab as sim
-from ui import safety_tab as safe
-from ui import procedure_tab as proc
 
 
 # -----------------------------------------------------------------------------
@@ -44,10 +40,15 @@ def is_local_environment():
         ip_addr = socket.gethostbyname(hostname)
         if "localhost" in hostname.lower():
             return True
-        return ip_addr.startswith("127.") or ip_addr.startswith("10.") or ip_addr.startswith("192.168.")
+        return (
+            ip_addr.startswith("127.")
+            or ip_addr.startswith("10.")
+            or ip_addr.startswith("192.168.")
+        )
     except OSError:
         # stlite/브라우저 런타임 등에서 소켓 조회가 제한될 수 있음
         return True
+
 
 IS_OFFLINE = is_local_environment()
 
@@ -94,6 +95,7 @@ def _mark_offline_onboarding_seen(stage):
         st.session_state.offline_onboarding_done = True
         _save_offline_onboarding_done()
 
+
 # -----------------------------------------------------------------------------
 # 1. 페이지 설정 (Page Configuration)
 # -----------------------------------------------------------------------------
@@ -101,7 +103,7 @@ st.set_page_config(
     page_title="PharmaFrame",
     page_icon="💊",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # 커스텀 테마 CSS 적용
@@ -132,10 +134,13 @@ if "initialized" not in st.session_state:
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
             </style>
         """
-        st.markdown(splash_html.replace("__SPLASH_MSG__", utils.t("splash_msg")), unsafe_allow_html=True)
+        st.markdown(
+            splash_html.replace("__SPLASH_MSG__", utils.t("splash_msg")),
+            unsafe_allow_html=True,
+        )
 
 
-if 'lang' not in st.session_state:
+if "lang" not in st.session_state:
     # URL 파라미터에서 언어 설정 확인 (링크 공유 시 언어 유지)
     url_lang = st.query_params.get("lang", "KO")
     if url_lang in ["KO", "EN"]:
@@ -144,57 +149,70 @@ if 'lang' not in st.session_state:
         st.session_state.lang = "KO"
 
 # 세션 상태 초기화: 새로고침 시에도 데이터가 유지되도록 기본값 설정
-if 'user_name' not in st.session_state:
+if "user_name" not in st.session_state:
     st.session_state.user_name = utils.t("default_user")
-if 'drug_schedule' not in st.session_state:
+if "drug_schedule" not in st.session_state:
     st.session_state.drug_schedule = []
-if 'drug_schedule_b' not in st.session_state:
+if "drug_schedule_b" not in st.session_state:
     st.session_state.drug_schedule_b = []
-if 'compare_mode' not in st.session_state:
+if "compare_mode" not in st.session_state:
     st.session_state.compare_mode = False
-if 'user_profile' not in st.session_state:
+if "user_profile" not in st.session_state:
     st.session_state.user_profile = {
         "name": utils.t("default_user"),
-        "weight": 60.0, "height": 170.0, "age": 25, "ast": 20.0, "alt": 20.0, "body_fat": 22.0,
-        "first_hrt_date": datetime.now().date()
+        "weight": 60.0,
+        "height": 170.0,
+        "age": 25,
+        "ast": 20.0,
+        "alt": 20.0,
+        "body_fat": 22.0,
+        "first_hrt_date": datetime.now().date(),
     }
-if 'calibration_factors' not in st.session_state:
+if "calibration_factors" not in st.session_state:
     # 경로별 기본값 1.0
     st.session_state.calibration_factors = {
-        "Injection": 1.0, "Oral": 1.0, "Transdermal": 1.0, "Sublingual": 1.0
+        "Injection": 1.0,
+        "Oral": 1.0,
+        "Transdermal": 1.0,
+        "Sublingual": 1.0,
     }
-if 'lab_history' not in st.session_state:
-    st.session_state.lab_history = {} # 구조: { "Injection": [{"day": 14, "value": 150}, ...], ... }
-if 'surgery_mode' not in st.session_state:
+if "lab_history" not in st.session_state:
+    st.session_state.lab_history = {}  # 구조: { "Injection": [{"day": 14, "value": 150}, ...], ... }
+if "surgery_mode" not in st.session_state:
     st.session_state.surgery_mode = False
-if 'stop_day' not in st.session_state:
+if "stop_day" not in st.session_state:
     st.session_state.stop_day = 30
-if 'is_smoker' not in st.session_state:
+if "is_smoker" not in st.session_state:
     st.session_state.is_smoker = False
-if 'history_vte' not in st.session_state:
+if "history_vte" not in st.session_state:
     st.session_state.history_vte = False
-if 'start_date' not in st.session_state:
+if "start_date" not in st.session_state:
     # 서버 시간(UTC)에 9시간을 더해 한국/아시아권 사용자들이
     # '오늘 날짜'를 볼 확률을 높여줍니다. (단순 편의성)
     st.session_state.start_date = (datetime.utcnow() + timedelta(hours=9)).date()
-if 'anesthesia_type' not in st.session_state:
+if "anesthesia_type" not in st.session_state:
     st.session_state.anesthesia_type = utils.t("anesthesia_gen")
-if 'stop_date' not in st.session_state:
+if "stop_date" not in st.session_state:
     st.session_state.stop_date = st.session_state.start_date + timedelta(days=30)
-if 'resume_date' not in st.session_state:
+if "resume_date" not in st.session_state:
     st.session_state.resume_date = st.session_state.start_date + timedelta(days=50)
-if 'surgery_date' not in st.session_state:
+if "surgery_date" not in st.session_state:
     st.session_state.surgery_date = st.session_state.start_date + timedelta(days=44)
-if 'has_spiro' not in st.session_state: st.session_state.has_spiro = False
-if 'has_cpa' not in st.session_state: st.session_state.has_cpa = False
-if 'has_p4' not in st.session_state: st.session_state.has_p4 = False
-if 'has_gnrh' not in st.session_state: st.session_state.has_gnrh = False
-if 'selected_interactors' not in st.session_state: st.session_state.selected_interactors = []
-if 'resume_day' not in st.session_state:
+if "has_spiro" not in st.session_state:
+    st.session_state.has_spiro = False
+if "has_cpa" not in st.session_state:
+    st.session_state.has_cpa = False
+if "has_p4" not in st.session_state:
+    st.session_state.has_p4 = False
+if "has_gnrh" not in st.session_state:
+    st.session_state.has_gnrh = False
+if "selected_interactors" not in st.session_state:
+    st.session_state.selected_interactors = []
+if "resume_day" not in st.session_state:
     st.session_state.resume_day = 50
-if 'surg_sim_duration' not in st.session_state:
+if "surg_sim_duration" not in st.session_state:
     st.session_state.surg_sim_duration = max(30, int(st.session_state.resume_day + 30))
-if 'unit_choice' not in st.session_state:
+if "unit_choice" not in st.session_state:
     st.session_state.unit_choice = "pg/mL"
 if "disclaimer_agreed" not in st.session_state:
     st.session_state.disclaimer_agreed = False
@@ -203,12 +221,15 @@ if "offline_landing_seen_disclaimer" not in st.session_state:
 if "offline_landing_seen_welcome" not in st.session_state:
     st.session_state.offline_landing_seen_welcome = False
 if "offline_onboarding_done" not in st.session_state:
-    st.session_state.offline_onboarding_done = IS_OFFLINE and _load_offline_onboarding_done()
+    st.session_state.offline_onboarding_done = (
+        IS_OFFLINE and _load_offline_onboarding_done()
+    )
 
 # EMR 업로더 로직이 rerun을 유발하므로 탭 생성 전 처리
 EMR.init_session()
 EMR.handle_mounting()
 inout.DataManager.handle_import_session()
+
 
 # -----------------------------------------------------------------------------
 # 3. 캐싱 함수 (Caching Functions for Optimization)
@@ -217,13 +238,21 @@ inout.DataManager.handle_import_session()
 def get_analyzer(weight, age, ast, alt, body_fat, height):
     """Analyzer 객체 생성 캐싱: 사용자 프로필이 변경되지 않으면 객체를 재사용"""
     return analysis.HormoneAnalyzer(
-        user_weight=weight, user_age=age, ast=ast, alt=alt, body_fat=body_fat, user_height=height
+        user_weight=weight,
+        user_age=age,
+        ast=ast,
+        alt=alt,
+        body_fat=body_fat,
+        user_height=height,
     )
+
 
 # -----------------------------------------------------------------------------
 # 4. 사이드바 렌더링 (Sidebar Rendering)
 # -----------------------------------------------------------------------------
-allow_app_without_landing = IS_OFFLINE and st.session_state.get("offline_onboarding_done", False)
+allow_app_without_landing = IS_OFFLINE and st.session_state.get(
+    "offline_onboarding_done", False
+)
 with st.sidebar:
     # 동의 전 랜딩 화면에서는 lang 위젯 충돌 방지를 위해
     # 전체 사이드바(UI의 key="lang" 포함)를 렌더링하지 않습니다.
@@ -255,7 +284,7 @@ if not st.session_state.disclaimer_agreed and not allow_app_without_landing:
         2. 이 도구는 의료 기기가 아니며, 임상적 결정을 대체할 수 없습니다.
         3. 반드시 담당 의사 또는 약사와 상의 후 처방에 따르십시오.
         """)
-        
+
         if st.button(utils.t("landing_agree_btn"), type="primary"):
             st.session_state.disclaimer_agreed = True
             st.rerun()
@@ -280,10 +309,8 @@ if not st.session_state.drug_schedule and not allow_app_without_landing:
 # -----------------------------------------------------------------------------
 tabs_config = [
     {"title": "📈 시뮬레이션 (Simulation)", "key": "sim"},
-    {"title": "🏥 처치/수술 계획 (Procedure Plan)", "key": "proc"},
-    {"title": "🛡️ 안전성 & 모니터링 (Safety)", "key": "safe"},
     {"title": "📊 리포트/데이터 (Export)", "key": "rep"},
-    {"title": "❓ 도움말 (FAQ)", "key": "faq"}
+    {"title": "❓ 도움말 (FAQ)", "key": "faq"},
 ]
 
 tab_objs = st.tabs([t["title"] for t in tabs_config])
@@ -298,47 +325,48 @@ with tabs["sim"]:
     # simulation_tab에서 알아서 PKEngine을 캐싱 및 렌더링함
     sim.render_simulator_tab()
 
-# [Tab 2: Procedure Plan]
-with tabs["proc"]:
-    proc.render_procedure_tab()
-    
-# [Tab 3: Safety & Monitoring]
-with tabs["safe"]:
-    safe.render_safety_tab()
-
-# [Tab 4: Report & Export]
+# [Tab 2: Report & Export]
 with tabs["rep"]:
     if IS_OFFLINE:
         st.header(utils.t("emr_tab_title"))
         EMR.render_tab_management()
         st.markdown("---")
-    
+
     st.header(utils.t("report_header"))
     c_rep3, c_rep4 = st.columns(2)
 
     with c_rep3:
         st.subheader("데이터 백업 (JSON)")
         st.caption("현재 입력된 프로필과 약물 스케줄을 파일로 저장합니다.")
-        
+
         json_str = inout.DataManager.export_to_json(
-            st.session_state.user_profile, 
+            st.session_state.user_profile,
             st.session_state.drug_schedule,
             st.session_state.calibration_factors,
             st.session_state.lab_history,
             st.session_state.drug_schedule_b,
-            st.session_state.compare_mode
+            st.session_state.compare_mode,
         )
-        export_date = datetime.now().strftime('%Y%m%d')
+        export_date = datetime.now().strftime("%Y%m%d")
         file_name = f"{st.session_state.user_name}_{export_date}.json"
-        st.download_button(utils.t("json_export_btn"), json_str, file_name, "application/json", width="stretch", key="json_export_btn")
-        
+        st.download_button(
+            utils.t("json_export_btn"),
+            json_str,
+            file_name,
+            "application/json",
+            width="stretch",
+            key="json_export_btn",
+        )
+
     with c_rep4:
         st.subheader(utils.t("json_import_label"))
         st.caption("저장된 JSON 파일을 불러와 이전 상태를 복원합니다.")
         st.file_uploader(
-            utils.t("json_import_label"), 
-            type="json", 
-            key=st.session_state.get("import_uploader_key", "json_import_uploader_init")
+            utils.t("json_import_label"),
+            type="json",
+            key=st.session_state.get(
+                "import_uploader_key", "json_import_uploader_init"
+            ),
         )
 
 # [Tab 3: FAQ]

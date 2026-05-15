@@ -3,158 +3,161 @@ from datetime import datetime, timedelta
 import numpy as np
 
 from utils import utils
-from core import data
+from core.pk_engine import PKEngine
+from core.models import PatientProfile, DoseEvent
 from ui import plot_utils as plot
-from core import pk_engine as analysis
-
 
 @st.cache_data(show_spinner=False)
-def run_simulation_cached(drug_schedule, user_profile, sim_duration, calibration_factors, stop_day, resume_day, surgery_mode):
-    #시뮬레이션 로직 캐싱: 입력값이 동일할 경우 재계산을 방지하여 성능 최적화
-    local_analyzer = analysis.HormoneAnalyzer(
-        user_weight=user_profile['weight'],
-        user_age=user_profile['age'],
-        ast=user_profile.get('ast', 20.0),
-        alt=user_profile.get('alt', 20.0),
-        body_fat=user_profile.get('body_fat', 22.0),
-        user_height=user_profile.get('height', 170.0)
+def run_simulation_cached(drug_schedule, user_profile, sim_duration):
+    # PKEngine 객체 생성 (환자 프로필 적용)
+    patient = PatientProfile(
+        name=user_profile.get("name", "User"),
+        age=user_profile.get("age", 50),
+        weight_kg=user_profile.get("weight", 60.0),
+        height_cm=user_profile.get("height", 170.0),
+        body_fat_pct=user_profile.get("body_fat", 22.0),
+        ast_u_l=user_profile.get("ast", 20.0),
+        alt_u_l=user_profile.get("alt", 20.0)
     )
-    # [최적화] resolution을 24(1시간 단위)로 설정하여 모바일 렌더링 부하 감소 (기본값 100 대비 경량화)
-    return local_analyzer.simulate_schedule(
-        drug_schedule, 
-        days=sim_duration,
-        resolution=24, 
-        calibration_factors=calibration_factors,
-        stop_day=stop_day if surgery_mode else None,
-        resume_day=resume_day if surgery_mode else None
-    )
-
-
-def render_simulator_tab(analyzer):
-    st.markdown(f"### {utils.t('sim_title')}")
-
-    current_drugs = st.session_state.drug_schedule
+    engine = PKEngine(patient)
     
+    # Session Schedule을 DoseEvent로 변환
+    # 스케줄을 기간(sim_duration) 전체로 풀어서 이벤트 리스트 생성
+    events = []
+    for item in drug_schedule:
+        drug_id = item["drug_id"]
+        dose = item["dose"]
+        interval = item["interval"]
+        route = item["type"]
+        
+        # 0일부터 sim_duration 일까지 interval 간격으로 이벤트 생성
+        current_time_h = 0.0
+        max_time_h = sim_duration * 24.0
+        while current_time_h <= max_time_h:
+            events.append(DoseEvent(
+                drug_id=drug_id,
+                dose=dose,
+                time_h=current_time_h,
+                route=route
+            ))
+            current_time_h += (interval * 24.0)
+            
+    # 시뮬레이션 실행
+    return engine.simulate(events, days=sim_duration, resolution=24)
+
+
+def render_simulator_tab():
+    st.markdown(f"### 시뮬레이션 대시보드")
+
     col_opt1, col_opt2, col_opt3 = st.columns([1, 2, 1])
     with col_opt1:
-        unit_choice = st.radio(utils.t("unit_choice"), ["pg/mL", "pmol/L"], horizontal=True, key="unit_choice")
+        unit_choice = st.radio("그래프 단위", ["기본 단위", "상대적 단위 (%)"], horizontal=True, key="unit_choice")
     with col_opt2:
-        sim_duration = st.slider(utils.t("sim_days"), 7, 180, 30)
+        sim_duration = st.slider("시뮬레이션 기간 (일)", 7, 365, 30)
     with col_opt3:
-        # 24시간 집중 보기 토글을 빈 자리로 이동하여 UI를 더 깔끔하게 만듭니다.
-        intensive_view = st.toggle(
-            utils.t("intensive_24h_view"),
-            value=False,
-            help=utils.t("intensive_24h_help"),
-        )
+        intensive_view = st.toggle("최근 48시간 집중 보기", value=False)
 
-    # 1. 그래프에 그릴 '에스트로겐' 제형만 정의
-    estrogen_types = ["Injection", "Oral", "Transdermal", "Sublingual"]
+    sched = st.session_state.get("drug_schedule", [])
+    
+    if not sched:
+        st.info("사이드바에서 약물을 추가하여 시뮬레이션을 시작하세요.")
+        return None
 
-    # 2. 해당 제형인 약물만 필터링하여 시뮬레이션 투입
-    e2_sched = [
-        d for d in st.session_state.drug_schedule 
-        if d['name'] in data.DRUG_DB and data.DRUG_DB[d['name']].type in estrogen_types
-    ]
-
-    # 2. 시뮬레이션 실행 (E2)
-    # [변경] 내부적으로는 항정 상태를 위해 충분히 긴 기간(180일)을 시뮬레이션
-    calc_duration = 180
+    # 시뮬레이션 실행 (장기 예측을 위해 실제 보여줄 기간보다 여유있게 계산)
+    calc_duration = max(sim_duration, 180)
     t_full, y_full = run_simulation_cached(
-        e2_sched,
+        sched,
         st.session_state.user_profile,
-        calc_duration,
-        st.session_state.calibration_factors,
-        st.session_state.stop_day,
-        st.session_state.resume_day,
-        False
+        calc_duration
     )
 
     y_full_b = None
     if st.session_state.compare_mode:
-        e2_sched_b = [
-            d for d in st.session_state.drug_schedule_b 
-            if d['name'] in data.DRUG_DB and data.DRUG_DB[d['name']].type in estrogen_types
-        ]
-        
-        _, y_full_b = run_simulation_cached(
-            e2_sched_b,
-            st.session_state.user_profile,
-            calc_duration,
-            st.session_state.calibration_factors,
-            st.session_state.stop_day,
-            st.session_state.resume_day,
-            False
-        )
+        sched_b = st.session_state.get("drug_schedule_b", [])
+        if sched_b:
+            _, y_full_b = run_simulation_cached(
+                sched_b,
+                st.session_state.user_profile,
+                calc_duration
+            )
 
-    # 4. 단위 변환
-    if unit_choice == "pmol/L":
-        y_full = utils.convert_e2_unit(y_full, "pmol/L")
-        if y_full_b is not None:
-            y_full_b = utils.convert_e2_unit(y_full_b, "pmol/L")
+    # 단위 변환 로직 보류 (범용화)
+    # y_full 값은 기본적으로 약물 데이터베이스에 따른 상대 농도 혹은 pg/mL. 
+    # 현재는 기본 농도로 출력.
 
-    # [날짜 변환 준비]
-    start_dt = datetime.combine(st.session_state.start_date, datetime.min.time())
-    # 피검사 기록 포인트 준비
-    lab_dates = []
-    lab_values = []
-    lab_texts = []
-    lab_points_for_rmse = []
-    if st.session_state.lab_history:
-        for route, records in st.session_state.lab_history.items():
-            for record in records:
-                # 날짜 변환
-                d = start_dt + timedelta(days=float(record['day']))
-                lab_dates.append(d)
-                
-                # 단위 변환
-                val = record['value']
-                if unit_choice == "pmol/L":
-                    val = utils.convert_e2_unit(val, "pmol/L")
-                lab_values.append(val)
-                lab_texts.append(f"{utils.t('actual_measure')} ({route}): {val:.1f} {unit_choice}")
-                lab_points_for_rmse.append((record['day'], val))
+    start_dt = datetime.combine(st.session_state.get("start_date", datetime.now().date()), datetime.min.time())
 
-
-    # 5. 통계 계산 (항정 상태 분석을 위해 90일~180일 구간 데이터 사용)
-    # 대부분의 약물이 90일 이전에 항정 상태(Steady State)에 도달하므로, 이 구간의 통계가 가장 정확합니다.
-    steady_mask = (t_full >= 90) & (t_full <= 180)
+    # 통계 계산 (항정 상태 분석)
+    steady_mask = (t_full >= min(30, sim_duration/2)) & (t_full <= calc_duration)
     has_steady = np.any(steady_mask)
     
     stats_y = y_full[steady_mask] if has_steady else y_full
     stats_t = t_full[steady_mask] if has_steady else t_full
 
     stats = utils.calculate_stats(stats_y, stats_t)
-    rmse = utils.calculate_rmse(t_full, y_full, lab_points_for_rmse)
     
     stats_b = None
     if st.session_state.compare_mode and y_full_b is not None:
         stats_y_b = y_full_b[steady_mask] if has_steady else y_full_b
         stats_b = utils.calculate_stats(stats_y_b, stats_t)
 
-    # [그래프 표시용 데이터 슬라이싱] 사용자가 선택한 sim_duration만큼 잘라서 표시
+    # 그래프 표시용 슬라이싱
     view_mask = t_full <= sim_duration
     t_days = t_full[view_mask]
     y_conc = y_full[view_mask]
     y_conc_b = y_full_b[view_mask] if y_full_b is not None else None
 
-    # [날짜 변환] 슬라이싱된 t_days를 기준으로 날짜 리스트 생성
-    t_dates = [start_dt + timedelta(days=float(t)) for t in t_days]
-
-    # 24시간 집중 보기 로직 적용
     if intensive_view:
-        # 마지막 48시간(2일) 데이터를 슬라이싱하여 일주기성 강조
         view_range = 2.0 
         mask = t_days >= (sim_duration - view_range)
-        
         t_plot_days = t_days[mask]
         y_plot_conc = y_conc[mask]
-        y_plot_conc_b = y_conc_b[mask] if y_conc_b is not None else None
-        
-        # 현재는 일관성을 위해 실제 날짜 객체 리스트 사용
-        t_plot_dates = [start_dt + timedelta(days=float(t)) for t in t_plot_days]
+        y_plot_b = y_conc_b[mask] if y_conc_b is not None else None
+        t_dates_plot = [start_dt + timedelta(days=float(t)) for t in t_plot_days]
     else:
         t_plot_days = t_days
+        y_plot_conc = y_conc
+        y_plot_b = y_conc_b
+        t_dates_plot = [start_dt + timedelta(days=float(t)) for t in t_days]
+
+    # 임시: plot_utils.py 업데이트 전까지는 기존 create_hormone_chart 사용 시도
+    # (추후 plot_utils.py도 범용화 리팩토링 예정)
+    try:
+        fig = plot.create_hormone_chart(
+            t_dates=t_dates_plot,
+            t_days=t_plot_days,
+            y_conc=y_plot_conc,
+            unit_choice="기본 단위", # 강제 고정
+            compare_mode=st.session_state.compare_mode,
+            y_conc_b=y_plot_b,
+            surgery_mode=False,
+            start_date=start_dt.date()
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.error(f"그래프 렌더링 오류 (Plot Utils 리팩토링 대기 중): {e}")
+
+    # 주요 지표 UI
+    st.markdown("---")
+    st.markdown("#### 예상 약동학(PK) 지표")
+    st.caption("안정 상태(Steady State) 도달 이후의 예상 농도입니다.")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("최고 농도 (Peak)", f"{stats['peak']:.1f}")
+    col2.metric("최저 농도 (Trough)", f"{stats['trough']:.1f}")
+    col3.metric("평균 농도 (Avg)", f"{stats['avg']:.1f}")
+    col4.metric("변동폭 (Fluctuation)", f"{stats['fluctuation']:.1f}%")
+
+    if st.session_state.compare_mode and stats_b:
+        st.markdown("##### 시나리오 B 지표")
+        cb1, cb2, cb3, cb4 = st.columns(4)
+        cb1.metric("최고 농도 (Peak)", f"{stats_b['peak']:.1f}", delta=f"{stats_b['peak']-stats['peak']:.1f}")
+        cb2.metric("최저 농도 (Trough)", f"{stats_b['trough']:.1f}", delta=f"{stats_b['trough']-stats['trough']:.1f}")
+        cb3.metric("평균 농도 (Avg)", f"{stats_b['avg']:.1f}", delta=f"{stats_b['avg']-stats['avg']:.1f}")
+        cb4.metric("변동폭", f"{stats_b['fluctuation']:.1f}%", delta=f"{stats_b['fluctuation']-stats['fluctuation']:.1f}%")
+
+        return stats
+
         y_plot_conc = y_conc
         y_plot_conc_b = y_conc_b
         t_plot_dates = t_dates

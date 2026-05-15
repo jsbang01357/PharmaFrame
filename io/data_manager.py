@@ -453,14 +453,16 @@ class DataManager:
         ics_content = [
             "BEGIN:VCALENDAR",
             "VERSION:2.0",
-            "PRODID:-//EstroFrame//Hormone Schedule//KO",
+            "PRODID:-//PharmaFrame//Medication Schedule//EN",
             "CALSCALE:GREGORIAN"
         ]
         
         # 시작일이 없으면 오늘로 설정
         if start_date is None:
+            import datetime
             start_dt = datetime.datetime.now()
         else:
+            import datetime
             # date 객체를 datetime 객체로 변환 (시간은 오전 9시로 고정)
             start_dt = datetime.datetime.combine(start_date, datetime.time(9, 0))
         
@@ -471,10 +473,9 @@ class DataManager:
             all_schedules.extend([("B", d) for d in schedule_b])
 
         for scenario_label, drug in all_schedules:
-            interval_days = float(drug['interval'])
-            is_cycling = drug.get('is_cycling', False)
-            offset_days = drug.get('offset', 0.0)
-            duration = int(drug.get('duration', 1)) if is_cycling else 1
+            interval_days = float(drug.get('interval', 1.0))
+            # Generic 에서는 cycling을 사용하지 않으므로 기본값 1
+            duration = 1
             
             # 종료일 계산 (시뮬레이션 시작일 기준)
             until_date = start_dt + datetime.timedelta(days=duration_days)
@@ -487,11 +488,8 @@ class DataManager:
             else:
                 rrule = f"RRULE:FREQ=DAILY;INTERVAL={int(interval_days)};UNTIL={until_str}"
 
-            # Cycling Mode일 경우 duration만큼 반복되는 이벤트를 생성
             for d in range(duration):
-                # 각 투여 시점의 첫 시작일 계산
-                current_offset = offset_days + d
-                first_dose_dt = start_dt + datetime.timedelta(days=current_offset)
+                first_dose_dt = start_dt
                 event_start = first_dose_dt.strftime("%Y%m%dT090000")
                 interval_display = f"{interval_days:g} day(s)"
                 

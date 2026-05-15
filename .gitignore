@@ -1,0 +1,31 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv_estro/
+ENV/
+.env
+.idea/
+.streamlit/
+.pytest_cache/
+.DS_Store
+
+
+
+# PDF 및 임시 파일
+*.pdf
+
+# PyInstaller build and distribution folders
+build/
+dist/
+
+
+
+
+# PyInstaller spec files
+*.spec
+
+# Patient data (CSV/JSON) - Exclude i18n.json from being ignored
+*.csv
+*.json
+!i18n.json

@@ -1,0 +1,31 @@
+- id: morphine_po
+  name: Morphine (Oral)
+  category: opioids
+  half_life_h: 2.0
+  routes:
+    PO:
+      bioavailability: 0.3
+      t_max_h: 1.0
+      vd_const: 3.0
+  monitoring:
+    - Respiratory rate
+    - Pain score
+  warning_msg: "호흡 억제 및 의존성 위험. 고령자 및 신기능 저하 환자에서 용량 조절 필요."
+  warning_msg_en: "Risk of respiratory depression and dependence. Dose adjust in elderly/renal impairment."
+  desc: "강력한 마약성 진통제 기준 약물."
+
+- id: oxycodone_po
+  name: Oxycodone
+  category: opioids
+  half_life_h: 3.5
+  routes:
+    PO:
+      bioavailability: 0.7
+      t_max_h: 1.5
+      vd_const: 2.6
+  monitoring:
+    - Respiratory rate
+    - Pain score
+  warning_msg: "모르핀 대비 경구 생체이용률이 높음. 오남용 주의."
+  warning_msg_en: "Higher oral bioavailability than morphine. High abuse potential."
+  desc: "경구 투여 효율이 좋은 마약성 진통제."

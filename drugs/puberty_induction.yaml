@@ -1,0 +1,33 @@
+- id: e2_valerate_induction
+  name: Estradiol Valerate (Low Dose)
+  category: puberty_induction
+  half_life_h: 14.0
+  routes:
+    PO:
+      bioavailability: 0.05
+      t_max_h: 6.0
+      vd_const: 12.0
+  monitoring:
+    - E2
+    - Bone Age (성장판)
+    - Tanner Stage
+  warning_msg: "사춘기 유도는 매우 낮은 용량으로 시작하여 서서히 증량해야 최종 키 성장에 지장을 주지 않습니다."
+  warning_msg_en: "Puberty induction must start at very low doses and titrate slowly to preserve final adult height."
+  desc: "초경/사춘기 유도를 위한 초저용량 에스트로겐 요법."
+
+- id: leuprorelin_gnrh
+  name: Leuprorelin (GnRH Agonist)
+  category: puberty_induction
+  half_life_h: 336.0 # 1개월 지속형 가정
+  routes:
+    SC:
+      bioavailability: 1.0
+      t_max_h: 4.0
+      vd_const: 117.0
+  monitoring:
+    - LH
+    - FSH
+    - Estradiol
+  warning_msg: "투여 초기 1~2주간 호르몬 수치가 일시적으로 상승(Flare effect)할 수 있습니다."
+  warning_msg_en: "Initial transient increase in hormones (flare effect) may occur in the first 1-2 weeks."
+  desc: "사춘기 지연 및 조기 사춘기 억제를 위한 약물."

@@ -1,0 +1,31 @@
+- id: aspirin
+  name: Aspirin (Low Dose)
+  category: cardiovascular
+  half_life_h: 0.3
+  routes:
+    PO:
+      bioavailability: 0.5
+      t_max_h: 1.0
+      vd_const: 0.15
+  monitoring:
+    - Bleeding signs
+  warning_msg: "위장관 출혈 위험. 수술 전 중단 고려(일반적으로 7일 전)."
+  warning_msg_en: "Risk of GI bleeding. Consider holding before surgery (usually 7 days)."
+  desc: "혈소판 응집 억제제."
+
+- id: atorvastatin
+  name: Atorvastatin
+  category: cardiovascular
+  half_life_h: 14.0
+  routes:
+    PO:
+      bioavailability: 0.14
+      t_max_h: 1.5
+      vd_const: 5.4
+  monitoring:
+    - Lipid profile
+    - LFT (AST/ALT)
+    - CK (Muscle ache)
+  warning_msg: "근육통(Myopathy) 및 간수치 상승 주의."
+  warning_msg_en: "Monitor for myopathy and elevated liver enzymes."
+  desc: "HMG-CoA 환원효소 억제제 (스타틴). 콜레스테롤 저하."

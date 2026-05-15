@@ -1,0 +1,32 @@
+- id: ibuprofen
+  name: Ibuprofen
+  category: nsaids
+  half_life_h: 2.0
+  routes:
+    PO:
+      bioavailability: 0.8
+      t_max_h: 1.5
+      vd_const: 0.15
+  monitoring:
+    - Renal function
+    - GI symptoms
+  warning_msg: "위장관 출혈 위험이 있으므로 식후 복용이 권장됩니다."
+  warning_msg_en: "GI bleeding risk; take with food."
+  desc: "흔히 사용되는 비스테로이드성 항염증제."
+  desc_en: "Commonly used NSAID."
+
+- id: naproxen
+  name: Naproxen
+  category: nsaids
+  half_life_h: 14.0
+  routes:
+    PO:
+      bioavailability: 0.95
+      t_max_h: 3.0
+      vd_const: 0.16
+  monitoring:
+    - Renal function
+  warning_msg: "장기 복용 시 신장 기능 및 위점막 손상 주의."
+  warning_msg_en: "Monitor renal function and gastric mucosa with long-term use."
+  desc: "작용 시간이 긴 NSAID."
+  desc_en: "Long-acting NSAID."

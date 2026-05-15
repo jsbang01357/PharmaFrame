@@ -1,0 +1,33 @@
+- id: levothyroxine
+  name: Levothyroxine
+  category: thyroid
+  half_life_h: 168.0
+  routes:
+    PO:
+      bioavailability: 0.75
+      t_max_h: 2.5
+      vd_const: 0.14
+  monitoring:
+    - TSH
+    - free T4
+  warning_msg: "심질환이나 부정맥이 있는 경우 신중히 투여해야 합니다."
+  warning_msg_en: "Use with caution in patients with cardiac disease or arrhythmias."
+  desc: "갑상선 호르몬 보충제. 반감기가 매우 깁니다."
+  desc_en: "Thyroid hormone replacement. Very long half-life."
+
+- id: liothyronine
+  name: Liothyronine (T3)
+  category: thyroid
+  half_life_h: 24.0
+  routes:
+    PO:
+      bioavailability: 0.95
+      t_max_h: 2.0
+      vd_const: 0.15
+  monitoring:
+    - TSH
+    - free T3
+  warning_msg: "심계항진 및 빈맥 주의."
+  warning_msg_en: "Monitor for palpitations and tachycardia."
+  desc: "활성형 갑상선 호르몬. 작용 발현이 빠릅니다."
+  desc_en: "Active thyroid hormone (T3). Rapid onset."

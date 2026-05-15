@@ -1,8 +1,13 @@
 import streamlit as st
+import os
+import yaml
+from glob import glob
 from datetime import datetime, timedelta
 
 from utils import utils
 from core import data
+from core.pk_engine import PKEngine
+from core.models import PatientProfile
 from io import emr_manager as EMR
 
 # -----------------------------------------------------------------------------
@@ -39,16 +44,16 @@ def render_profile_section():
     """신체 계측 정보 및 상세 설정"""
     with st.expander(utils.t('sidebar_profile'), expanded=True):
         # 필수 정보
-        age = st.number_input(utils.t("age_label"), min_value=15, max_value=80, 
-                              value=int(st.session_state.user_profile.get("age", 25)))
+        age = st.number_input(utils.t("age_label"), min_value=15, max_value=100, 
+                              value=int(st.session_state.user_profile.get("age", 50)))
         
         col_body1, col_body2 = st.columns(2)
         with col_body1:
             height = st.number_input(utils.t("height_label"), min_value=100.0, max_value=250.0, 
-                                     value=float(st.session_state.user_profile.get("height", 170.0)), step=0.5)
+                                     value=float(st.session_state.user_profile.get("height", 165.0)), step=0.5)
         with col_body2:
             weight = st.number_input(utils.t("weight_label"), min_value=30.0, max_value=250.0, 
-                                     value=float(st.session_state.user_profile.get("weight", 60.0)), step=0.5)
+                                     value=float(st.session_state.user_profile.get("weight", 65.0)), step=0.5)
 
         # BMI 자동 계산 및 표시
         bmi = weight / ((height / 100) ** 2)
@@ -84,20 +89,57 @@ def render_profile_section():
         })
 
 # -----------------------------------------------------------------------------
+# 1.5 Clinical Module Selector (Multi-App)
+# -----------------------------------------------------------------------------
+def get_available_categories():
+    categories = set()
+    for file_path in glob(os.path.join("drugs", "*.yaml")):
+        with open(file_path, "r", encoding="utf-8") as f:
+            data_list = yaml.safe_load(f)
+            if data_list:
+                for item in data_list:
+                    categories.add(item.get("category", "general"))
+    # 한글 매핑을 위한 임시 딕셔너리
+    return sorted(list(categories))
+
+def render_module_selector():
+    st.markdown("---")
+    st.subheader("🏥 Clinical Scenario")
+    categories = get_available_categories()
+    
+    category_display_map = {
+        "thyroid": "갑상선 (Thyroid)",
+        "menopausal_hrt": "폐경 후 호르몬 요법 (MHRT)",
+        "opioids": "마약성 진통제 (Opioids)",
+        "nsaids": "비스테로이드성 항염증제 (NSAIDs)",
+        "puberty_induction": "사춘기 초경 호르몬 유도 (Puberty)",
+        "cardiovascular": "심혈관 질환 (Cardiovascular)",
+        "general": "기타 (General)"
+    }
+    
+    # 영문 모드일 경우 매핑 변경 필요하지만 임시로 직접 보여줌
+    display_options = [category_display_map.get(c, c.capitalize()) for c in categories]
+    
+    selected_display = st.selectbox("Select Module", display_options, label_visibility="collapsed")
+    
+    # 매핑 역추적
+    selected_cat = "general"
+    for k, v in category_display_map.items():
+        if v == selected_display:
+            selected_cat = k
+            break
+            
+    st.session_state.current_module = selected_cat
+
+# -----------------------------------------------------------------------------
 # 2. 약물 추가 (Protocol)
 # -----------------------------------------------------------------------------
 def render_medication_section():
-    with st.expander(utils.t('sidebar_add'), expanded=True):
-        """약물 추가 및 스케줄 관리 섹션"""
-
-        # [Fix] 비교 모드 토글을 사이드바(항상 렌더링되는 곳)로 이동하여 
-        # 탭 전환 시 상태가 초기화되는 문제와 '두 번 클릭' 문제를 해결합니다.
+    with st.expander("약물 스케줄 관리", expanded=True):
         st.checkbox(utils.t("compare_mode"), key="compare_mode")
 
-        # [위치 이동] 시나리오 선택 UI를 최상단으로 배치
         target_sched_key = "drug_schedule"
         if st.session_state.compare_mode:
-            # [Fix] key를 추가하여 약물 추가/삭제(rerun) 시에도 선택한 시나리오(A/B)가 유지되도록 합니다.
             scenario_choice = st.radio(utils.t("edit_scenario"), [utils.t("scenario_a"), utils.t("scenario_b")], horizontal=True, key="edit_scenario_choice")
             target_sched_key = "drug_schedule" if scenario_choice == utils.t("scenario_a") else "drug_schedule_b"
             
@@ -105,49 +147,58 @@ def render_medication_section():
                 st.session_state.drug_schedule_b = [d.copy() for d in st.session_state.drug_schedule]
                 st.rerun()
 
-        # ---------------------------------------------------------
-        # [NEW] 🐣 입문 세트 버튼 (체크리스트 연동 적용)
-        # ---------------------------------------------------------
-        st.caption(utils.t("starter_set_caption"))
+        # Engine 초기화를 통한 약물 목록 로드
+        dummy_patient = PatientProfile()
+        engine = PKEngine(dummy_patient)
         
-        col_set1, col_set2 = st.columns(2)
+        # 현재 선택된 카테고리에 맞는 약물만 필터링
+        available_drugs = [drug for drug in engine.drug_db.values() if drug.category == st.session_state.get("current_module", "general")]
         
-        # 버튼 1: 경구 (2mg BID) + CPA 체크박스 ON
-        with col_set1:
-            if st.button(
-                utils.t("starter_oral_cpa_btn"),
-                use_container_width=True,
-                help=utils.t("starter_oral_cpa_help"),
-            ):
-                # 1. 약물 리스트 세팅 (에스트로겐만)
-                st.session_state.drug_schedule = [
-                    {"name": "Estradiol Valerate (Progynova)", "type": "Oral", "dose": 2.0, "interval": 0.5, "id": "set1_e2"}
-                ]
-                
-                # 2. 체크리스트 상태 동기화 (CPA 켜기!)
-                st.session_state.has_cpa = True   # <--- 핵심: CPA 체크박스 ON
-                st.session_state.has_spiro = False
-                st.session_state.has_p4 = False
-                st.session_state.has_gnrh = False
-                
-                st.toast(utils.t("starter_oral_cpa_toast"), icon="💊")
+        if not available_drugs:
+            st.warning("선택한 모듈에 등록된 약물이 없습니다.")
+            return
+
+        drug_options = {d.id: f"{d.name}" for d in available_drugs}
+        
+        with st.container(border=True):
+            selected_drug_id = st.selectbox("약물 선택", options=list(drug_options.keys()), format_func=lambda x: drug_options[x])
+            selected_drug = engine.drug_db[selected_drug_id]
+            
+            # 해당 약물의 투여 경로 목록
+            route_options = list(selected_drug.routes.keys())
+            selected_route = st.selectbox("투여 경로", route_options)
+            
+            c1, c2 = st.columns(2)
+            dose = c1.number_input("1회 투여량", value=10.0, step=1.0)
+            interval = c2.number_input("투여 간격 (일)", value=1.0, step=0.1)
+            
+            if st.button("➕ 스케줄 추가", type="primary", use_container_width=True):
+                import uuid
+                new_item = {
+                    "id": str(uuid.uuid4())[:8],
+                    "drug_id": selected_drug_id,
+                    "name": selected_drug.name,
+                    "type": selected_route,
+                    "dose": float(dose),
+                    "interval": float(interval)
+                }
+                st.session_state[target_sched_key].append(new_item)
                 st.rerun()
 
-        # 버튼 2: 주사 (10mg 2주) + 모든 체크박스 OFF (단독 요법 가정)
-        with col_set2:
-            if st.button(
-                utils.t("starter_injection_btn"),
-                use_container_width=True,
-                help=utils.t("starter_injection_help"),
-            ):
-                # 1. 약물 리스트 세팅
-                st.session_state.drug_schedule = [
-                    {"name": "Estradiol Valerate (Progynon Depot)", "type": "Injection", "dose": 10.0, "interval": 14.0, "id": "set2_inj"}
-                ]
-                
-                # 2. 체크리스트 초기화 (주사 단독이라 가정)
-                st.session_state.has_cpa = False
-                st.session_state.has_spiro = False
+        # 현재 스케줄 리스트 표시
+        st.markdown("#### 현재 스케줄")
+        schedule_list = st.session_state[target_sched_key]
+        if not schedule_list:
+            st.caption("등록된 약물이 없습니다.")
+        else:
+            for i, item in enumerate(schedule_list):
+                with st.container(border=True):
+                    st.write(f"**{item['name']}** ({item['type']})")
+                    st.write(f"💊 {item['dose']} / 매 {item['interval']}일")
+                    if st.button("🗑️ 삭제", key=f"del_{item['id']}_{target_sched_key}_{i}", help="이 약물을 삭제합니다"):
+                        st.session_state[target_sched_key].pop(i)
+                        st.rerun()
+
                 st.session_state.has_p4 = False
                 st.session_state.has_gnrh = False
                 

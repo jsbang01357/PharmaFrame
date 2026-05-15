@@ -1,0 +1,48 @@
+- id: estradiol_valerate_mhrt
+  name: Estradiol Valerate (Progynova)
+  category: menopausal_hrt
+  half_life_h: 14.0
+  routes:
+    PO:
+      bioavailability: 0.05
+      t_max_h: 6.0
+      vd_const: 12.0
+  monitoring:
+    - E2
+    - Endometrial thickness
+  warning_msg: "폐경 후 여성에서 자궁내막 증식 예방을 위해 프로게스테론과 병용이 필요할 수 있습니다."
+  warning_msg_en: "May require progesterone co-administration to prevent endometrial hyperplasia in postmenopausal women."
+  desc: "폐경 후 증상 완화를 위한 에스트로겐 보충제."
+  desc_en: "Estrogen replacement for menopausal symptom relief."
+
+- id: estradiol_patch_mhrt
+  name: Estradiol Patch (Climara/Vivelle)
+  category: menopausal_hrt
+  half_life_h: 36.0
+  routes:
+    Patch:
+      bioavailability: 1.0
+      t_max_h: 12.0
+      vd_const: 30.0
+  monitoring:
+    - E2
+  warning_msg: "피부 자극 주의 및 도포 부위 순환."
+  warning_msg_en: "Monitor for skin irritation and rotate application sites."
+  desc: "간 대사를 거치지 않아 혈전 위험이 낮은 패치 제제."
+  desc_en: "Transdermal patch with lower VTE risk due to bypassing first-pass metabolism."
+
+- id: progesterone_micronized
+  name: Micronized Progesterone (Utrogestan)
+  category: menopausal_hrt
+  half_life_h: 18.0
+  routes:
+    PO:
+      bioavailability: 0.08
+      t_max_h: 2.5
+      vd_const: 12.0
+  monitoring:
+    - Progesterone
+  warning_msg: "졸음을 유발할 수 있으므로 취침 전 복용이 권장됩니다."
+  warning_msg_en: "May cause drowsiness; bedtime administration recommended."
+  desc: "천연 프로게스테론. 에스트로겐과 병용하여 자궁내막을 보호합니다."
+  desc_en: "Micronized progesterone used for endometrial protection."

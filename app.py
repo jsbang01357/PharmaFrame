@@ -15,15 +15,14 @@ from utils import utils
 from ui import sidebar as ui
 from ui import plot_utils as plot
 from ui import simulation_tab as sim
+from ui import safety_tab as safe
+from ui import procedure_tab as proc
 
 
 # -----------------------------------------------------------------------------
 # 0. 오프라인/온라인 환경 확인
 # -----------------------------------------------------------------------------
 def is_local_environment():
-    # 1) 명시적 설정값(환경변수) 우선
-    #    - true: 1, true, yes, on
-    #    - false: 0, false, no, off
     for env_key in ("PHARMAFRAME_FORCE_OFFLINE", "FORCE_OFFLINE_MODE"):
         raw = os.getenv(env_key)
         if raw is None:
@@ -34,7 +33,6 @@ def is_local_environment():
         if val in ("0", "false", "no", "off"):
             return False
 
-    # 2) fallback: 네트워크 힌트 기반 추정
     try:
         hostname = socket.gethostname()
         ip_addr = socket.gethostbyname(hostname)
@@ -46,7 +44,6 @@ def is_local_environment():
             or ip_addr.startswith("192.168.")
         )
     except OSError:
-        # stlite/브라우저 런타임 등에서 소켓 조회가 제한될 수 있음
         return True
 
 
@@ -54,7 +51,6 @@ IS_OFFLINE = is_local_environment()
 
 
 def _offline_onboarding_flag_path():
-    """오프라인 랜딩 완료 상태를 영구 저장할 파일 경로"""
     if getattr(sys, "frozen", False):
         base_dir = os.path.dirname(sys.executable)
     else:
@@ -79,7 +75,6 @@ def _save_offline_onboarding_done():
 
 
 def _mark_offline_onboarding_seen(stage):
-    """오프라인에서 랜딩 2종 모두 본 경우 영구 스킵 처리"""
     if not IS_OFFLINE:
         return
     if stage == "disclaimer":
@@ -106,13 +101,11 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 커스텀 테마 CSS 적용
 ui.apply_custom_theme()
 
 # -----------------------------------------------------------------------------
 # 2. 초기 로딩 및 세션 상태 초기화 (Splash Screen & Session Init)
 # -----------------------------------------------------------------------------
-# 앱이 처음 로드될 때 빈 화면 대신 로딩 애니메이션을 보여줍니다.
 if "initialized" not in st.session_state:
     splash = st.empty()
     with splash.container():
@@ -141,14 +134,9 @@ if "initialized" not in st.session_state:
 
 
 if "lang" not in st.session_state:
-    # URL 파라미터에서 언어 설정 확인 (링크 공유 시 언어 유지)
     url_lang = st.query_params.get("lang", "KO")
-    if url_lang in ["KO", "EN"]:
-        st.session_state.lang = url_lang
-    else:
-        st.session_state.lang = "KO"
+    st.session_state.lang = url_lang if url_lang in ["KO", "EN"] else "KO"
 
-# 세션 상태 초기화: 새로고침 시에도 데이터가 유지되도록 기본값 설정
 if "user_name" not in st.session_state:
     st.session_state.user_name = utils.t("default_user")
 if "drug_schedule" not in st.session_state:
@@ -165,97 +153,36 @@ if "user_profile" not in st.session_state:
         "age": 25,
         "ast": 20.0,
         "alt": 20.0,
-        "body_fat": 22.0,
-        "first_hrt_date": datetime.now().date(),
+        "egfr": 100.0,
+        "body_fat": 22.0
     }
 if "calibration_factors" not in st.session_state:
-    # 경로별 기본값 1.0
-    st.session_state.calibration_factors = {
-        "Injection": 1.0,
-        "Oral": 1.0,
-        "Transdermal": 1.0,
-        "Sublingual": 1.0,
-    }
+    st.session_state.calibration_factors = {"Injection": 1.0, "Oral": 1.0, "Transdermal": 1.0, "Sublingual": 1.0}
 if "lab_history" not in st.session_state:
-    st.session_state.lab_history = {}  # 구조: { "Injection": [{"day": 14, "value": 150}, ...], ... }
+    st.session_state.lab_history = {}
 if "surgery_mode" not in st.session_state:
     st.session_state.surgery_mode = False
-if "stop_day" not in st.session_state:
-    st.session_state.stop_day = 30
-if "is_smoker" not in st.session_state:
-    st.session_state.is_smoker = False
-if "history_vte" not in st.session_state:
-    st.session_state.history_vte = False
 if "start_date" not in st.session_state:
-    # 서버 시간(UTC)에 9시간을 더해 한국/아시아권 사용자들이
-    # '오늘 날짜'를 볼 확률을 높여줍니다. (단순 편의성)
     st.session_state.start_date = (datetime.utcnow() + timedelta(hours=9)).date()
-if "anesthesia_type" not in st.session_state:
-    st.session_state.anesthesia_type = utils.t("anesthesia_gen")
-if "stop_date" not in st.session_state:
-    st.session_state.stop_date = st.session_state.start_date + timedelta(days=30)
-if "resume_date" not in st.session_state:
-    st.session_state.resume_date = st.session_state.start_date + timedelta(days=50)
-if "surgery_date" not in st.session_state:
-    st.session_state.surgery_date = st.session_state.start_date + timedelta(days=44)
-if "has_spiro" not in st.session_state:
-    st.session_state.has_spiro = False
-if "has_cpa" not in st.session_state:
-    st.session_state.has_cpa = False
-if "has_p4" not in st.session_state:
-    st.session_state.has_p4 = False
-if "has_gnrh" not in st.session_state:
-    st.session_state.has_gnrh = False
-if "selected_interactors" not in st.session_state:
-    st.session_state.selected_interactors = []
-if "resume_day" not in st.session_state:
-    st.session_state.resume_day = 50
-if "surg_sim_duration" not in st.session_state:
-    st.session_state.surg_sim_duration = max(30, int(st.session_state.resume_day + 30))
-if "unit_choice" not in st.session_state:
-    st.session_state.unit_choice = "pg/mL"
+if "current_module" not in st.session_state:
+    st.session_state.current_module = "thyroid"
+if "dose_overrides" not in st.session_state:
+    st.session_state.dose_overrides = {}
 if "disclaimer_agreed" not in st.session_state:
     st.session_state.disclaimer_agreed = False
-if "offline_landing_seen_disclaimer" not in st.session_state:
-    st.session_state.offline_landing_seen_disclaimer = False
-if "offline_landing_seen_welcome" not in st.session_state:
-    st.session_state.offline_landing_seen_welcome = False
 if "offline_onboarding_done" not in st.session_state:
-    st.session_state.offline_onboarding_done = (
-        IS_OFFLINE and _load_offline_onboarding_done()
-    )
+    st.session_state.offline_onboarding_done = IS_OFFLINE and _load_offline_onboarding_done()
 
-# EMR 업로더 로직이 rerun을 유발하므로 탭 생성 전 처리
 EMR.init_session()
 EMR.handle_mounting()
 inout.DataManager.handle_import_session()
 
 
 # -----------------------------------------------------------------------------
-# 3. 캐싱 함수 (Caching Functions for Optimization)
-# -----------------------------------------------------------------------------
-@st.cache_resource
-def get_analyzer(weight, age, ast, alt, body_fat, height):
-    """Analyzer 객체 생성 캐싱: 사용자 프로필이 변경되지 않으면 객체를 재사용"""
-    return analysis.HormoneAnalyzer(
-        user_weight=weight,
-        user_age=age,
-        ast=ast,
-        alt=alt,
-        body_fat=body_fat,
-        user_height=height,
-    )
-
-
-# -----------------------------------------------------------------------------
 # 4. 사이드바 렌더링 (Sidebar Rendering)
 # -----------------------------------------------------------------------------
-allow_app_without_landing = IS_OFFLINE and st.session_state.get(
-    "offline_onboarding_done", False
-)
+allow_app_without_landing = IS_OFFLINE and st.session_state.get("offline_onboarding_done", False)
 with st.sidebar:
-    # 동의 전 랜딩 화면에서는 lang 위젯 충돌 방지를 위해
-    # 전체 사이드바(UI의 key="lang" 포함)를 렌더링하지 않습니다.
     if st.session_state.get("disclaimer_agreed", False) or allow_app_without_landing:
         IS_OFFLINE = ui.render_sidebar(IS_OFFLINE)
     else:
@@ -270,7 +197,7 @@ if "initialized" not in st.session_state:
     splash.empty()
 
 # -----------------------------------------------------------------------------
-# 6. Global Landing Page (사용 동의 -> 사용 설명 -> 약물 입력)
+# 6. Global Landing Page
 # -----------------------------------------------------------------------------
 st.title(utils.t("dashboard_title"))
 if not st.session_state.disclaimer_agreed and not allow_app_without_landing:
@@ -309,8 +236,10 @@ if not st.session_state.drug_schedule and not allow_app_without_landing:
 # -----------------------------------------------------------------------------
 tabs_config = [
     {"title": "📈 시뮬레이션 (Simulation)", "key": "sim"},
+    {"title": "🏥 처치/수술 계획 (Procedure Plan)", "key": "proc"},
+    {"title": "🛡️ 안전성 & 모니터링 (Safety)", "key": "safe"},
     {"title": "📊 리포트/데이터 (Export)", "key": "rep"},
-    {"title": "❓ 도움말 (FAQ)", "key": "faq"},
+    {"title": "❓ 도움말 (FAQ)", "key": "faq"}
 ]
 
 tab_objs = st.tabs([t["title"] for t in tabs_config])
@@ -322,10 +251,17 @@ tabs = {config["key"]: obj for config, obj in zip(tabs_config, tab_objs)}
 
 # [Tab 1: Simulation]
 with tabs["sim"]:
-    # simulation_tab에서 알아서 PKEngine을 캐싱 및 렌더링함
     sim.render_simulator_tab()
 
-# [Tab 2: Report & Export]
+# [Tab 2: Procedure Plan]
+with tabs["proc"]:
+    proc.render_procedure_tab()
+    
+# [Tab 3: Safety & Monitoring]
+with tabs["safe"]:
+    safe.render_safety_tab()
+
+# [Tab 4: Report & Export]
 with tabs["rep"]:
     if IS_OFFLINE:
         st.header(utils.t("emr_tab_title"))

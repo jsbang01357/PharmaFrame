@@ -147,11 +147,13 @@ def render_medication_section():
             selected_drug_id = st.selectbox("약물 선택", options=list(drug_options.keys()), format_func=lambda x: drug_options[x])
             selected_drug = engine.drug_db[selected_drug_id]
             
-            if selected_drug.desc:
-                st.caption(f"ℹ️ {selected_drug.desc}")
+            desc = utils.get_localized_field(selected_drug, "desc")
+            if desc:
+                st.caption(f"ℹ️ {desc}")
             
-            if selected_drug.warning_msg:
-                st.warning(f"⚠️ {selected_drug.warning_msg}")
+            warn = utils.get_localized_field(selected_drug, "warning_msg")
+            if warn:
+                st.warning(f"⚠️ {warn}")
             
             route_options = list(selected_drug.routes.keys())
             selected_route = st.selectbox("투여 경로", route_options)

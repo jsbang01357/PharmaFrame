@@ -38,11 +38,13 @@ def render_safety_tab():
             st.markdown(f"**위험도:** <span style='color:{color}; font-weight:bold;'>{drug.risk_level}</span>", unsafe_allow_html=True)
             
             # 설명
-            st.markdown(f"**설명:** {drug.desc}")
+            desc = utils.get_localized_field(drug, "desc")
+            st.markdown(f"**설명:** {desc}")
             
             # 경고 메시지
-            if drug.warning_msg:
-                st.warning(f"⚠️ **경고:** {drug.warning_msg}")
+            warn = utils.get_localized_field(drug, "warning_msg")
+            if warn:
+                st.warning(f"⚠️ **경고:** {warn}")
                 
             # 모니터링 지표
             if drug.monitoring:

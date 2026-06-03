@@ -45,8 +45,17 @@ def create_pk_chart(
         if surgery_date is not None:
             surg_dt = datetime.combine(surgery_date, datetime.min.time())
             fig.add_vline(
-                x=surg_dt, line_dash="solid", line_color="red", line_width=2,
-                annotation_text=f"💉 {utils.t('surgery_day')}", annotation_position="top right"
+                x=surg_dt, line_dash="solid", line_color="red", line_width=2
+            )
+            fig.add_annotation(
+                x=surg_dt,
+                y=0.98,
+                yref="paper",
+                text=f"💉 {utils.t('surgery_day')}",
+                showarrow=False,
+                xanchor="left",
+                yanchor="top",
+                font=dict(color="red", size=11)
             )
 
     # 5. Main Scenario A Plot
